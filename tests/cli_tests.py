@@ -117,27 +117,6 @@ def test_parser():
         r"Trafilatura [0-9]\.[0-9]+\.[0-9] - Python [0-9]\.[0-9]+\.[0-9]", f.getvalue()
     )
 
-    # test deprecations
-    with patch.object(sys, "argv", ["", "--inputfile", "test.txt"]), pytest.raises(
-        ValueError
-    ):
-        cli.map_args(cli.parse_args(testargs))
-
-    for arg in ("--nocomments", "--notables", "--hash-as-name"):
-        testargs = ["", arg]
-        with patch.object(sys, "argv", testargs), pytest.raises(ValueError):
-            cli.map_args(cli.parse_args(testargs))
-
-    testargs = ["", "--inputdir", "test1"]
-    with patch.object(sys, "argv", testargs), pytest.raises(ValueError):
-        cli.map_args(cli.parse_args(testargs))
-    testargs = ["", "--outputdir", "test2"]
-    with patch.object(sys, "argv", testargs), pytest.raises(ValueError):
-        cli.map_args(cli.parse_args(testargs))
-    testargs = ["", "-out", "xml"]
-    with patch.object(sys, "argv", testargs), pytest.raises(ValueError):
-        cli.map_args(cli.parse_args(testargs))
-
 
 def test_climain(capfd):
     """test arguments and main CLI entrypoint"""
@@ -151,8 +130,11 @@ def test_climain(capfd):
     # help display
     assert subprocess.run([trafilatura_bin, "--help"], check=True).returncode == 0
     # piped input
-    empty_input = b"<html><body></body></html>"
-    assert subprocess.run([trafilatura_bin], input=empty_input, check=True).returncode == 0
+    empty_input = b"<html><body><article>" + b"<p>ABC</p>"*100 + b"</article></body></html>"
+    result = subprocess.run([trafilatura_bin], input=empty_input, check=True)
+    assert result.returncode == 0
+    captured = capfd.readouterr()
+    assert captured.out.strip().endswith("ABC")
     # input directory walking and processing
     env = os.environ.copy()
     if os.name == "nt":
@@ -288,15 +270,6 @@ def test_download():
 # @patch('trafilatura.settings.MAX_FILES_PER_DIRECTORY', 1)
 def test_cli_pipeline():
     """test command-line processing pipeline"""
-    # straight command-line input
-    # testargs = ['', '<html><body>Text</body></html>']
-    # with patch.object(sys, 'argv', testargs):
-    #    args = cli.parse_args(testargs)
-    # f = io.StringIO()
-    # with redirect_stdout(f):
-    #    cli.process_args(args)
-    # assert len(f.getvalue()) == 0
-
     # Force encoding to utf-8 for Windows in future processes spawned by multiprocessing.Pool
     os.environ["PYTHONIOENCODING"] = "utf-8"
 
